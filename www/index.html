@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Видео Приложение</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 90%;
+            max-width: 1200px; /* Увеличиваем максимальную ширину */
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #search {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        input[type="text"],
+        input[type="submit"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        input[type="text"] {
+            width: 70%;
+        }
+        input[type="submit"] {
+            width: 28%;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        tr:hover {
+            background-color: #f2f2f2;
+        }
+        .video-link {
+            text-decoration: none;
+            color: #333;
+            font-weight: bold;
+        }
+        .video-actions button {
+            padding: 8px 12px;
+            margin-right: 8px;
+            margin-bottom: 8px; /* Добавляем отступ снизу */
+            border: none;
+            border-radius: 5px;
+            background-color: #ddd;
+            color: #555;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+
+        }
+
+        .video-actions button:hover {
+            background-color: #ccc;
+        }
+        .upload-form {
+            text-align: center;
+        }
+        .upload-form input[type="file"] {
+            display: none;
+        }
+        .upload-form label {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .upload-form label:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Список видео</h1>
+    <div id="search">
+        <input type="text" name="q" placeholder="Поиск" id="searchInput">
+        <input type="submit" value="Искать" id="searchButton">
+    </div>
+    <table>
+        <tr>
+            <th>Название видео</th>
+            <th>Действия</th>
+        </tr>
+        <tr>
+            <td><a href="{{ url_for('watch', video_name=video) }}" class="video-link">{{ video }}</a></td>
+            <td class="video-actions">
+                <button onclick="moveVideoUp('{{ video }}')">Вверх</button>
+                <button onclick="moveVideoDown('{{ video }}')">Вниз</button>
+                <button onclick="deleteVideo('{{ video }}')">Удалить</button>
+            </td>
+        </tr>
+    </table>
+    <h2>Загрузить видео</h2>
+    <div class="upload-form">
+        <input type="file" name="file" accept="video/*" id="fileInput">
+        <label for="fileInput">Выберите файл</label>
+        <input type="submit" value="Загрузить" id="uploadVideo">
+    </div>
+</div>
+
+<!-- Скрипты для управления действиями -->
+<script>
+    const formData = new FormData();
+    const xtr = new XMLHttpRequest()
+
+
+    const uploadButton = document.getElementById('uploadVideo');
+    uploadButton.addEventListener('click', uploadVideo)
+
+    const searchButton = document.getElementById('searchButton');
+    searchButton.addEventListener('click', (event) => {
+        event.preventDefault();
+
+
+        const searchText = document.getElementById('searchInput').value;
+        console.log(searchText);
+        if (searchText){
+            removeExceptSpecified(searchText);
+        }
+        else {
+            getVideoList();
+        }
+    })
+
+    function removeExceptSpecified(keepVideoName) {
+        // Получаем все строки таблицы
+        const rows = document.querySelectorAll('table tr');
+
+        // Перебираем строки, начиная со второй, так как первая содержит заголовки
+        rows.forEach((row, index) => {
+            if (index === 0) return; // Пропускаем первую строку с заголовками
+
+            // Проверяем, содержит ли какая-либо ячейка в строке заданный текст частично
+            const hasText = Array.from(row.cells).some(cell => cell.textContent.trim().toLowerCase().includes(keepVideoName.toLowerCase()));
+
+            // Если строка не содержит заданный текст, удаляем её
+            if (!hasText) {
+                row.remove();
+            }
+        });
+    }
+
+    function getVideoList() {
+        fetch('http://localhost:8080/videos/list')
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                const table = document.querySelector('table');
+
+                // Очистим таблицу перед добавлением новых данных
+                table.innerHTML = '<tr><th>Название видео</th><th>Действия</th></tr>';
+
+                // Добавляем каждое видео в таблицу
+                data.forEach(video => {
+                    const row = table.insertRow(); // Создаем новую строку
+                    const nameCell = row.insertCell(0); // Создаем ячейку для названия
+                    const actionsCell = row.insertCell(1); // Создаем ячейку для действий
+
+                    // Заполняем ячейку с названием видео
+                    const videoLink = document.createElement('a');
+                    videoLink.href = `/video/${video.replace(/\.mp4$/, '')}`;
+                    videoLink.className = 'video-link';
+                    videoLink.textContent = video;
+                    nameCell.appendChild(videoLink);
+
+                    // Заполняем ячейку с действиями
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Удалить';
+                    deleteButton.id = 'deleteButton';
+                    deleteButton.onclick = () => deleteVideo(video);
+                    deleteButton.style.padding = '8px 12px';
+                    deleteButton.style.marginRight = '8px';
+                    deleteButton.style.marginBottom = '8px';
+                    deleteButton.style.border = 'none';
+                    deleteButton.style.borderRadius = '5px';
+                    deleteButton.style.backgroundColor = '#ddd';
+                    deleteButton.style.color = '#555';
+                    deleteButton.style.cursor = 'pointer';
+                    deleteButton.style.transition = 'background-color 0.3s ease';
+
+                    actionsCell.appendChild(deleteButton);
+                });
+            })
+            .catch(error => {
+                console.log(error);
+            });
+    }
+
+    getVideoList();
+    function moveVideoUp(videoName) {
+        fetch('/move_up/' + videoName);
+        location.reload();
+    }
+
+    function moveVideoDown(videoName) {
+        fetch('/move_down/' + videoName);
+        location.reload();
+    }
+
+    function deleteVideo(videoName) {
+        console.log(videoName);
+        xtr.open('POST', 'http://localhost:8080/videos/delete', true);
+        xtr.setRequestHeader('Content-Type', 'application/json');
+        xtr.send(
+            JSON.stringify({videoName: videoName})
+        );
+        xtr.onreadystatechange = () => {
+            if (xtr.readyState === 4 && xtr.status === 200) {
+                location.reload();
+            }
+        }
+    }
+
+    function uploadVideo(event) {
+        event.preventDefault();
+
+        const fileInput = document.getElementById('fileInput');
+        const selectedFile = fileInput.files[0];
+
+        console.log(selectedFile)
+
+        const reader = new FileReader();
+        reader.readAsDataURL(selectedFile);
+        reader.onload = async () => {
+            const fileData = reader.result.split(',')[1]; // Получаем данные файла в base64
+            const fileName = selectedFile.name;
+
+            xtr.open('POST', 'http://localhost:8080/videos/upload', true);
+            xtr.setRequestHeader('Content-Type', 'application/json');
+            xtr.send(
+                JSON.stringify({data: fileData, fileName: fileName})
+            );
+            xtr.onreadystatechange = () => {
+                if (xtr.readyState === 4 && xtr.status === 200) {
+                    location.reload();
+                }
+            }
+        }
+
+    }
+
+
+
+
+</script>
+</body>
+</html>

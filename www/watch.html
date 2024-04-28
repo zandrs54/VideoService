@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Просмотр видео</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        video {
+            width: 800px; /* Задайте конкретную ширину */
+            height: 600px; /* Задайте конкретную высоту */
+            border: 2px solid #ccc; /* Добавляем рамку */
+            border-radius: 5px; /* Закругляем углы рамки */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f2f2f2;
+        }
+        form {
+            margin-top: 20px;
+            text-align: center;
+        }
+        input[type="text"],
+        input[type="submit"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        input[type="text"] {
+            width: 70%;
+        }
+        /* Стили для кнопки "Отправить" */
+        button#sendButton {
+            width: 28%;
+            background-color: #4CAF50; /* Цвет фона */
+            color: white; /* Цвет текста */
+            cursor: pointer;
+            padding: 10px; /* Внутренние отступы */
+            font-size: 16px; /* Размер текста */
+            border: none; /* Убираем границу */
+            border-radius: 5px; /* Закругляем углы */
+        }
+
+        /* При наведении */
+        button#sendButton:hover {
+            background-color: #45a049; /* Изменение цвета фона при наведении */
+        }
+        #nickname{
+            margin-bottom: 10px;
+        }
+        #comment{
+            width: 574px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Просмотр видео</h1>
+    <video controls autoplay id="video_player">
+        <source src="{{ url_for('serve_video', path=video_name) }}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <h2>Комментарии</h2>
+    <table>
+        <tr>
+            <th>Время</th>
+            <th>Пользователь</th>
+            <th>Комментарий</th>
+        </tr>
+    </table>
+    <h3>Добавить комментарий</h3>
+    <input type="text" name="username" placeholder="Ваш ник" id="nickname" required>
+    <br>
+    <textarea name="comment" placeholder="Текст комментария" rows="4" cols="50" id="comment"></textarea>
+    <br>
+    <button id="sendButton">Отправить</button>
+    <p><a href="https://www.google.com/search?q={{ video_title }}" target="_blank">Поискать на Google</a></p>
+    <p><a href="https://boosty.to/uttool" target="_blank">Бусти проекта</a></p>
+</div>
+<script>
+
+    const url = new URL(window.location.href).pathname;
+    const videoName = url.replace(/\/video\/?/, ''); // Заменяем '/video' или '/video/' на пустую строку
+    const xtr = new XMLHttpRequest();
+
+
+    const date = new Date();
+
+    currentDate = `${date.getDate()}.${date.getDay()}.${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}`;
+    console.log(currentDate);
+
+    console.log(videoName);
+
+    function clearCommentsTable() {
+        const commentsTable = document.querySelector('table');
+        // Удаляем все строки, начиная с первого дочернего элемента (не заголовка)
+        while (commentsTable.rows.length > 1) {
+            commentsTable.deleteRow(1); // Удаляем вторую строку (индекс 1) до тех пор, пока строки есть
+        }
+    }
+
+    function loadComments() {
+        clearCommentsTable();
+        fetch(`http://localhost:8080/video/source/${videoName}/comments`)
+            .then(response => response.json())
+            .then(comments => {
+                // Отображение комментариев на странице
+                const commentsTable = document.querySelector('table');
+                comments.forEach(comment => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                    <td>${comment.date}</td>
+                    <td>${comment.username}</td>
+                    <td>${comment.comment}</td>
+                `;
+                    commentsTable.appendChild(row);
+                });
+            })
+            .catch(error => console.error('Ошибка загрузки комментариев:', error));
+
+    }
+
+    function sendComments() {
+        console.log('отправка ракеты на украину')
+        const username = document.querySelector('#nickname').value;
+        const comment = document.querySelector('#comment').value;
+
+        console.log(currentDate, username, comment);
+
+        xtr.open('POST', `http://localhost:8080/video/source/${videoName}/addComment`, true);
+        xtr.setRequestHeader('Content-Type', 'application/json');
+
+        xtr.send(JSON.stringify({date: currentDate, username: username, comment: comment}));
+        xtr.onreadystatechange = () => {
+            if (xtr.readyState === 4) {
+                if (xtr.status === 200) {
+                    console.log('Отправка прошла успешно');
+                    loadComments();
+
+                } else {
+                    console.log('Ошибка отправки');
+                }
+            }
+        }
+    }
+
+    const sendButton = document.getElementById('sendButton');
+    sendButton.addEventListener('click', sendComments);
+
+    loadComments();
+
+    const video = document.getElementById('video_player');
+    video.src = `http://localhost:8080/video/source/${videoName}`;
+</script>
+</body>
+</html>
